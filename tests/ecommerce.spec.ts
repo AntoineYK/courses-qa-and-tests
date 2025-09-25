@@ -27,4 +27,16 @@ test.describe("Ecommerce's product page", () => {
 
     await expect(nav).toBeVisible();
   });
+
+  test("should go to product page", async ({ page }) => {
+    // Ceci est un Locator, il permet de localiser un élément de la page
+    // https://playwright.dev/docs/api/class-framelocator#frame-locator-get-by-label
+    // Ici nous localisons le lien vers la page products.
+    await page.getByRole("link", { name: " Products" }).click();
+
+    // On vérifie que l'URL de la page est bien celle de la page des produits
+    expect(page).toHaveURL("https://automationexercise.com/products");
+    // On vérifie que le titre de la page est bien celui de la page des produits
+    expect(await page.title()).toBe("Automation Exercise - All Products");
+  });
 });
