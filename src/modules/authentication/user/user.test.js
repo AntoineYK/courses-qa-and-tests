@@ -35,4 +35,16 @@ describe("User Service", () => {
       birthday: new Date(1997, 8, 13),
     });
   });
+
+  it("should trigger a bad request error when user creation", async () => {
+    try {
+      await createUser({
+        name: "Valentin R",
+      });
+      assert.fail("createUser should trigger an error.");
+    } catch (e) {
+      expect(e.name).toBe("HttpBadRequest");
+      expect(e.statusCode).toBe(400);
+    }
+  });
 });
