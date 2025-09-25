@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createUserInRepository } from "./user.repository.js";
 import { createUser } from "./user.service.js";
 
@@ -15,6 +15,7 @@ vi.mock("./user.repository", async (importOriginal) => ({
 }));
 
 describe("User Service", () => {
+  afterEach(() => vi.clearAllMocks());
   it("should create an user", async () => {
     const user = await createUser({
       name: "Valentin R",
