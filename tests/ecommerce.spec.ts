@@ -31,4 +31,23 @@ test.describe("Ecommerce's product page", () => {
     // CORRECTION APPLIQUÉE ICI
     expect(await products.count()).toBeGreaterThan(0);
   });
+
+  test("should contain product details like title and price", async ({
+    page,
+  }) => {
+    await page.goto("https://automationexercise.com/product_details/30");
+
+    await expect(page).toHaveTitle("Automation Exercise - Product Details");
+
+    const productName = page.getByRole("heading", {
+      name: "Premium Polo T-Shirts",
+    });
+    await expect(productName).toBeVisible();
+
+    const productPrice = page.getByText(/Rs\./);
+    await expect(productPrice).toBeVisible();
+
+    const addToCartButton = page.getByRole("button", { name: "Add to cart" });
+    await expect(addToCartButton).toBeVisible();
+  });
 });
