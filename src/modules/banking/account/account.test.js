@@ -1,112 +1,99 @@
-// account.service.spec.js
-import { strict as assert } from "node:assert";
+// @ts-nocheck
+import assert from "assert";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import {
   createAccountInRepository,
-  deleteAccountByIdForUserInRepository,
-  getAccountsByUserIdFromRepository,
-} from "./account.repository.js";
-import {
-  createAccount,
-  deleteAccount,
-  getAccounts,
-} from "./account.service.js";
+  deleteAccountInRepository,
+  getAccountsFromRepository,
+} from "./account.repository";
+import { createAccount, deleteAccount, getAccounts } from "./account.service";
 
+// --- Mock du repository --- //
 vi.mock("./account.repository", async (importOriginal) => ({
   ...(await importOriginal()),
-  createAccountInRepository: vi.fn(),
-  getAccountsByUserIdFromRepository: vi.fn(),
-  deleteAccountByIdForUserInRepository: vi.fn(),
+  createAccountInRepository: vi.fn((data) => ({
+    id: 1,
+    userId: data.userId,
+    balance: data.balance,
+    currency: data.currency,
+  })),
+  getAccountsFromRepository: vi.fn((userId) => [
+    { id: 1, userId, balance: 1000, currency: "EUR" },
+    { id: 2, userId, balance: 2000, currency: "USD" },
+  ]),
+  deleteAccountInRepository: vi.fn((userId, accountId) => {
+    if (accountId === 999) {
+      throw new Error("Account not found");
+    }
+    return true;
+  }),
 }));
 
 describe("Account Service", () => {
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
-  it("createAccount réussi", async () => {
-    createAccountInRepository.mockResolvedValueOnce({
-      id: 12,
-      userId: 2,
-      amount: 150.5,
+  it("should create an account successfully", async () => {
+    const account = await createAccount({
+      userId: 10,
+      balance: 500,
+      currency: "EUR",
     });
-
-    const payload = { userId: 2, amount: 150.5 };
-    const account = await createAccount(payload);
 
     expect(account).toBeDefined();
     expect(account.id).toBeTypeOf("number");
-    expect(account).toHaveProperty("userId", 2);
-    expect(account).toHaveProperty("amount", 150.5);
-
-    expect(createAccountInRepository).toBeCalledTimes(1);
-    expect(createAccountInRepository).toBeCalledWith(payload);
+    expect(account.userId).toBe(10);
+    expect(account.balance).toBe(500);
+    expect(account.currency).toBe("EUR");
+    expect(createAccountInRepository).toBeCalledWith({
+      userId: 10,
+      balance: 500,
+      currency: "EUR",
+    });
   });
 
-  it("createAccount échoue avec de mauvais paramètres", async () => {
+  it("should fail to create account with missing parameters", async () => {
     try {
-      // userId manquant -> schéma invalide
-      await createAccount({ amount: 50 });
-      assert.fail("createAccount devrait lever une erreur de validation.");
+      await createAccount({
+        balance: 500,
+        // userId et currency manquent
+      });
+      assert.fail("createAccount should trigger an error.");
     } catch (e) {
-      expect(e.name).toBe("HttpBadRequest");
-      expect(e.statusCode).toBe(400);
-      expect(createAccountInRepository).not.toHaveBeenCalled();
+      expect(e).toBeInstanceOf(Error);
+      expect(e.message).toContain("Missing required fields");
     }
   });
 
-  it("getAccounts réussi en vérifiant chaque élément de la liste", async () => {
-    const userId = 3;
-    const rows = [
-      { id: 1, userId, amount: 0 },
-      { id: 2, userId, amount: 200.75 },
-      { id: 3, userId, amount: 50 },
-    ];
-    getAccountsByUserIdFromRepository.mockResolvedValueOnce(rows);
+  it("should get accounts successfully", async () => {
+    const accounts = await getAccounts(10);
 
-    const accounts = await getAccounts({ userId });
+    expect(accounts).toBeDefined();
+    expect(accounts.length).toBe(2);
+    expect(accounts[0]).toHaveProperty("id");
+    expect(accounts[0].userId).toBe(10);
+    expect(accounts[0].balance).toBeTypeOf("number");
+    expect(accounts[0].currency).toBe("EUR");
+    expect(accounts[1].currency).toBe("USD");
 
-    expect(Array.isArray(accounts)).toBe(true);
-    expect(accounts).toHaveLength(3);
-
-    accounts.forEach((acc, idx) => {
-      expect(acc).toHaveProperty("id", rows[idx].id);
-      expect(acc).toHaveProperty("userId", userId);
-      expect(acc.amount).toBeTypeOf("number");
-      expect(acc.amount).toBe(rows[idx].amount);
-    });
-
-    expect(getAccountsByUserIdFromRepository).toBeCalledTimes(1);
-    expect(getAccountsByUserIdFromRepository).toBeCalledWith(userId);
+    expect(getAccountsFromRepository).toBeCalledWith(10);
   });
 
-  it("deleteAccount réussi", async () => {
-    const data = { userId: 4, accountId: 10 };
-    const deleted = { id: 10, userId: 4, amount: 0 };
+  it("should delete an account successfully", async () => {
+    const result = await deleteAccount(10, 1);
 
-    deleteAccountByIdForUserInRepository.mockResolvedValueOnce(deleted);
-
-    const res = await deleteAccount(data);
-
-    expect(res).toEqual(deleted);
-    expect(deleteAccountByIdForUserInRepository).toBeCalledTimes(1);
-    expect(deleteAccountByIdForUserInRepository).toBeCalledWith(data);
+    expect(result).toBe(true);
+    expect(deleteAccountInRepository).toBeCalledWith(10, 1);
   });
 
-  it("deleteAccount échoue avec un mauvais id d'Account", async () => {
-    const data = { userId: 4, accountId: 999 }; // inexistant
-    // Le service considère "0", "null" ou "undefined" comme non trouvé
-    deleteAccountByIdForUserInRepository.mockResolvedValueOnce(0);
-
+  it("should fail to delete an account with wrong id", async () => {
     try {
-      await deleteAccount(data);
-      assert.fail(
-        "deleteAccount devrait lever HttpNotFound pour un mauvais id."
-      );
+      await deleteAccount(10, 999);
+      assert.fail("deleteAccount should trigger an error.");
     } catch (e) {
-      expect(e.name).toBe("HttpNotFound");
-      expect(e.statusCode).toBe(404);
-      expect(deleteAccountByIdForUserInRepository).toBeCalledTimes(1);
-      expect(deleteAccountByIdForUserInRepository).toBeCalledWith(data);
+      expect(e).toBeInstanceOf(Error);
+      expect(e.message).toBe("Account not found");
     }
   });
 });

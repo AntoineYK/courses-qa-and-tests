@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createUserInRepository } from "./user.repository.js";
 import { createUser } from "./user.service.js";
@@ -16,6 +15,7 @@ vi.mock("./user.repository", async (importOriginal) => ({
 
 describe("User Service", () => {
   afterEach(() => vi.clearAllMocks());
+
   it("should create an user", async () => {
     const user = await createUser({
       name: "Valentin R",
@@ -45,6 +45,19 @@ describe("User Service", () => {
     } catch (e) {
       expect(e.name).toBe("HttpBadRequest");
       expect(e.statusCode).toBe(400);
+    }
+  });
+
+  it("should trigger a forbidden error when user creation", async () => {
+    try {
+      await createUser({
+        name: "Valentin R",
+        birthday: new Date(2017, 8, 13),
+      });
+      assert.fail("createUser should trigger an error.");
+    } catch (e) {
+      expect(e.name).toBe("HttpForbidden");
+      expect(e.statusCode).toBe(403);
     }
   });
 });
